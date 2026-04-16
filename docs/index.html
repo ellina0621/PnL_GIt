@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易績效儀表板</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F5F0E8;--bg2:#EDE8DF;--bg3:#E4DDD2;
+  --surface:#FFFFFF;--surface2:#F0EBE2;
+  --navy:#1A2D5A;--navy2:#243D7A;--navy3:#0F1E3D;
+  --blue:#2563A8;--blue-lt:#D6E4F7;
+  --text:#1A2D5A;--text2:#4A5D8A;--text3:#8A99BB;
+  --border:rgba(26,45,90,0.1);--border2:rgba(26,45,90,0.18);
+  --green:#1A5C3A;--green-lt:#D6F0E2;
+  --red:#8B1A1A;--red-lt:#FAD7D7;
+  --gold:#8B6914;--gold-lt:#FFF3CD;
+  --radius:10px;--radius-lg:16px;
+  --mono:'Space Mono',monospace;
+  --sans:'Noto Sans TC',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh}
+.header{background:var(--navy);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.logo{font-family:var(--mono);font-size:12px;letter-spacing:0.12em;color:#fff;display:flex;align-items:center;gap:10px}
+.logo-dot{width:7px;height:7px;background:#B8E0FF;border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.header-nav{display:flex;gap:4px}
+.nav-btn{padding:6px 14px;border-radius:6px;border:none;background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);font-family:var(--sans);font-size:12px;cursor:pointer;transition:all 0.15s}
+.nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,0.18);color:#fff}
+.container{max-width:1200px;margin:0 auto;padding:28px 24px}
+.page{display:none}.page.active{display:block}
+
+/* METRIC CARDS */
+.metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.metric-label{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--text3);margin-bottom:8px}
+.metric-value{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--navy)}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:4px}
+.pos{color:var(--green)!important}.neg{color:var(--red)!important}
+.metric-card.highlight{background:var(--navy);border-color:var(--navy)}
+.metric-card.highlight .metric-label{color:rgba(255,255,255,0.5)}
+.metric-card.highlight .metric-value{color:#fff}
+.metric-card.highlight .metric-sub{color:rgba(255,255,255,0.4)}
+
+/* SECTION */
+.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px}
+.section-title{font-family:var(--mono);font-size:11px;letter-spacing:0.1em;color:var(--text3);margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.chart-wrap{position:relative;height:280px}
+
+/* GRID 2 COL */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px}
+
+/* STAT ROW */
+.stat-rows{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+.stat-row-label{font-size:12px;color:var(--text2)}
+.stat-row-value{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--navy)}
+
+/* TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 12px;font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg2)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:hover td{background:var(--surface2)}
+.ticker{font-family:var(--mono);font-weight:700;font-size:13px}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-family:var(--mono)}
+.badge-hold{background:var(--blue-lt);color:var(--blue)}
+.badge-sold{background:var(--bg3);color:var(--text3)}
+.tag{display:inline-block;background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--text3);margin:1px}
+
+/* GAUGE */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:8px}
+.gauge-label{font-family:var(--mono);font-size:10px;letter-spacing:0.1em;color:var(--text3)}
+.gauge-value{font-family:var(--mono);font-size:28px;font-weight:700}
+.gauge-sub{font-size:11px;color:var(--text3)}
+.score-bar{width:100%;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px}
+.score-fill{height:100%;border-radius:3px;transition:width 0.6s ease}
+
+/* LOADING */
+#loading{padding:80px;text-align:center;font-family:var(--mono);font-size:11px;letter-spacing:0.15em;color:var(--text3)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .metrics-grid{grid-template-columns:1fr 1fr}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .container{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    TRADE_JOURNAL
+  </div>
+  <div class="header-nav">
+    <button class="nav-btn active" onclick="showPage('dashboard',this)">儀表板</button>
+    <button class="nav-btn" onclick="showPage('trades',this)">交易記錄</button>
+    <button class="nav-btn" onclick="showPage('analytics',this)">深度分析</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div id="loading">LOADING DATA...</div>
+
+  <!-- ═══════ DASHBOARD PAGE ═══════ -->
+  <div class="page" id="page-dashboard">
+    <div class="metrics-grid" id="metrics-top"></div>
+    <div class="section">
+      <div class="section-title">EQUITY_CURVE — 權益曲線</div>
+      <div class="chart-wrap"><canvas id="equityChart"></canvas></div>
+    </div>
+    <div class="grid2">
+      <div class="section">
+        <div class="section-title">DAILY_PNL — 每日損益</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="dailyPnlChart"></canvas></div>
+      </div>
+      <div class="section">
+        <div class="section-title">DRAWDOWN — 回撤曲線</div>
+        <div class="chart-wrap" style="height:200px"><canvas id="drawdownChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ TRADES PAGE ═══════ -->
+  <div class="page" id="page-trades">
+    <div class="metrics-grid" id="trade-stats"></div>
+    <div class="section">
+      <div class="section-title">TRADE_LOG — 交易記錄</div>
+      <div class="table-wrap" id="trade-table"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ ANALYTICS PAGE ═══════ -->
+  <div class="page" id="page-analytics">
+    <div class="grid3" id="analytics-cards"></div>
+    <div class="grid2">
+      <div class="section">
+        <div class="section-title">INDUSTRY_DIST — 產業分佈（損益）</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="industryChart"></canvas></div>
+      </div>
+      <div class="section">
+        <div class="section-title">WIN_LOSS_DIST — 單筆損益分佈</div>
+        <div class="chart-wrap" style="height:240px"><canvas id="pnlDistChart"></canvas></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">METRICS_DETAIL — 完整績效指標</div>
+      <div id="metrics-detail"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Utility functions（全域，不依賴資料）──────────────────────────────────────
+function fmt(n,dec=0){return Number(n).toLocaleString('zh-TW',{minimumFractionDigits:dec,maximumFractionDigits:dec})}
+function fmtPct(n,dec=2){return (n*100).toFixed(dec)+'%'}
+function fmtSign(n){return (n>=0?'+':'')+fmt(n)}
+function colorSign(n){return n>=0?'var(--green)':'var(--red)'}
+
+// ── Page switch（全域，onclick 呼叫）──────────────────────────────────────────
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── 載入 data.json 並渲染 ──────────────────────────────────────────────────────
+fetch('data.json')
+  .then(r=>{if(!r.ok)throw new Error('HTTP '+r.status+' — 找不到 data.json');return r.json();})
+  .then(DATA=>{
+    document.getElementById('loading').style.display='none';
+    document.getElementById('page-dashboard').classList.add('active');
+
+    const M=DATA.metrics, EQ=DATA.equity, TR=DATA.trades, CAPITAL=DATA.capital;
+    const labels=EQ.map(e=>e.date);
+    const equities=EQ.map(e=>e.equity);
+
+    // ── Dashboard metrics ──────────────────────────────────────────────────
+    const topMetrics=[
+      {label:'TOTAL_PNL',value:(M.total_pnl>=0?'+':'')+fmt(M.total_pnl)+' NT$',sub:'累積損益',highlight:true,pos:M.total_pnl>=0},
+      {label:'TOTAL_RETURN',value:fmtPct(M.total_ret),sub:'總報酬率',pos:M.total_ret>=0},
+      {label:'ANN_RETURN',value:fmtPct(M.ann_ret),sub:'年化報酬率',pos:M.ann_ret>=0},
+      {label:'WIN_RATE',value:fmtPct(M.win_rate),sub:`${M.win_trades}勝 / ${M.loss_trades}負`,pos:M.win_rate>=0.5},
+      {label:'SHARPE',value:M.sharpe.toFixed(2),sub:'夏普值 (RF=1.7%)',pos:M.sharpe>=1},
+      {label:'SORTINO',value:M.sortino.toFixed(2),sub:'索提諾比率',pos:M.sortino>=1},
+      {label:'MAX_DD',value:fmtPct(M.mdd),sub:'最大回撤',pos:false},
+      {label:'ANN_VOL',value:fmtPct(M.ann_vol),sub:'年化波動度',pos:null},
+    ];
+    const metricsTop=document.getElementById('metrics-top');
+    topMetrics.forEach(m=>{
+      const c=document.createElement('div');
+      c.className='metric-card'+(m.highlight?' highlight':'');
+      const valStyle=m.pos===null?'':(m.highlight?'':` style="color:${m.pos?'var(--green)':'var(--red)'}"`)
+      c.innerHTML=`<div class="metric-label">${m.label}</div><div class="metric-value"${valStyle}>${m.value}</div><div class="metric-sub">${m.sub}</div>`;
+      metricsTop.appendChild(c);
+    });
+
+    // ── Equity Chart ───────────────────────────────────────────────────────
+    const baseline=Array(equities.length).fill(CAPITAL);
+    new Chart(document.getElementById('equityChart'),{
+      type:'line',
+      data:{labels,datasets:[
+        {label:'權益',data:equities,borderColor:'#1A2D5A',borderWidth:2,fill:true,
+         backgroundColor:'rgba(26,45,90,0.06)',pointRadius:0,tension:0.3},
+        {label:'本金',data:baseline,borderColor:'rgba(26,45,90,0.2)',borderWidth:1,
+         borderDash:[4,4],pointRadius:0,fill:false},
+      ]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' NT$ '+fmt(ctx.raw)}}},
+        scales:{
+          x:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',maxTicksLimit:10,font:{family:'Space Mono',size:10}}},
+          y:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10},callback:v=>'NT$'+fmt(v)}},
+        }
+      }
+    });
+
+    // ── Daily PNL Chart ────────────────────────────────────────────────────
+    const dailyChanges=EQ.map(e=>e.daily_change);
+    const pnlColors=dailyChanges.map(v=>v>=0?'rgba(26,92,58,0.7)':'rgba(139,26,26,0.7)');
+    new Chart(document.getElementById('dailyPnlChart'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'日損益',data:dailyChanges,backgroundColor:pnlColors,borderRadius:2}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+fmtSign(ctx.raw)+' NT$'}}},
+        scales:{
+          x:{display:false},
+          y:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10},callback:v=>fmtSign(v)}},
+        }
+      }
+    });
+
+    // ── Drawdown Chart ─────────────────────────────────────────────────────
+    let peak=equities[0],ddArr=[];
+    equities.forEach(e=>{if(e>peak)peak=e;ddArr.push((e-peak)/peak*100);});
+    new Chart(document.getElementById('drawdownChart'),{
+      type:'line',
+      data:{labels,datasets:[{label:'回撤',data:ddArr,borderColor:'rgba(139,26,26,0.8)',borderWidth:1.5,
+        fill:true,backgroundColor:'rgba(139,26,26,0.08)',pointRadius:0,tension:0.3}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.raw.toFixed(2)+'%'}}},
+        scales:{
+          x:{display:false},
+          y:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10},callback:v=>v.toFixed(1)+'%'}},
+        }
+      }
+    });
+
+    // ── Trade stats ────────────────────────────────────────────────────────
+    const holdCount=TR.filter(t=>!t.sell_date||t.sell_date==='').length;
+    const allPnl=TR.filter(t=>t.pnl!==0).map(t=>t.pnl);
+    const tradeStats=[
+      {label:'TOTAL_TRADES',value:M.total_trades,sub:'已關倉'},
+      {label:'HOLDING',value:holdCount,sub:'持倉中'},
+      {label:'AVG_WIN',value:'+'+fmt(M.avg_win),sub:'平均獲利 NT$'},
+      {label:'AVG_LOSS',value:fmt(M.avg_loss),sub:'平均虧損 NT$'},
+      {label:'PROFIT_FACTOR',value:M.profit_factor.toFixed(2)+'x',sub:'盈虧比'},
+      {label:'EXPECTED_VALUE',value:(M.expected_value>=0?'+':'')+fmt(M.expected_value),sub:'期望值 NT$'},
+      {label:'BEST_TRADE',value:'+'+fmt(Math.max(...allPnl)),sub:'最佳單筆'},
+      {label:'WORST_TRADE',value:fmt(Math.min(...allPnl)),sub:'最差單筆'},
+    ];
+    const tradeStatsEl=document.getElementById('trade-stats');
+    tradeStats.forEach(m=>{
+      const c=document.createElement('div');
+      c.className='metric-card';
+      const isPos=parseFloat(m.value)>=0;
+      const needColor=['AVG_WIN','AVG_LOSS','BEST_TRADE','WORST_TRADE','EXPECTED_VALUE'].includes(m.label);
+      c.innerHTML=`<div class="metric-label">${m.label}</div><div class="metric-value"${needColor?` style="color:${isPos?'var(--green)':'var(--red)'}"`:''}>${m.value}</div><div class="metric-sub">${m.sub}</div>`;
+      tradeStatsEl.appendChild(c);
+    });
+
+    // ── Trade table ────────────────────────────────────────────────────────
+    const sorted=[...TR].sort((a,b)=>new Date(b.buy_date)-new Date(a.buy_date));
+    document.getElementById('trade-table').innerHTML=`
+<table>
+  <thead><tr>
+    <th>代號</th><th>名稱</th><th>市場</th><th>產業</th>
+    <th>買進日</th><th>賣出日</th><th>天數</th><th>股數</th>
+    <th>買進價</th><th>賣出價</th><th>損益 NT$</th><th>報酬率</th><th>狀態</th>
+  </tr></thead>
+  <tbody>
+  ${sorted.map(t=>{
+    const bc=t.pnl>0?'var(--green)':t.pnl<0?'var(--red)':'var(--text)';
+    return `<tr>
+      <td class="ticker">${t.ticker}</td>
+      <td>${t.name}</td>
+      <td><span class="tag">${t.market}</span></td>
+      <td style="font-size:11px;color:var(--text3)">${t.industry}</td>
+      <td style="font-family:var(--mono);font-size:12px">${t.buy_date}</td>
+      <td style="font-family:var(--mono);font-size:12px">${t.sell_date||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:var(--text3)">${t.days||'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px">${fmt(t.qty)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${fmt(t.buy_price,2)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${t.sell_price?fmt(t.sell_price,2):'—'}</td>
+      <td style="font-family:var(--mono);font-size:13px;font-weight:700;color:${bc}">${t.pnl?(t.pnl>=0?'+':'')+fmt(t.pnl,0):'—'}</td>
+      <td style="font-family:var(--mono);font-size:12px;color:${bc}">${t.ret?(t.ret>=0?'+':'')+fmtPct(t.ret):'—'}</td>
+      <td><span class="badge ${(t.sell_date&&t.sell_date!=='')?'badge-sold':'badge-hold'}">${(t.sell_date&&t.sell_date!=='')?'已賣出':'持有'}</span></td>
+    </tr>`;
+  }).join('')}
+  </tbody>
+</table>`;
+
+    // ── Analytics cards ────────────────────────────────────────────────────
+    const analyticsCards=[
+      {label:'SHARPE_RATIO',value:M.sharpe.toFixed(2),sub:M.sharpe>=2?'優秀':M.sharpe>=1?'良好':'需改進',note:'>1良好 >2優秀',pos:M.sharpe>=1},
+      {label:'SORTINO_RATIO',value:M.sortino.toFixed(2),sub:M.sortino>=2?'優秀':M.sortino>=1?'良好':'需改進',note:'只計下行風險',pos:M.sortino>=1},
+      {label:'PROFIT_FACTOR',value:M.profit_factor.toFixed(2)+'x',sub:M.profit_factor>=2?'優秀':M.profit_factor>=1.5?'良好':'普通',note:'平均獲利/平均虧損',pos:M.profit_factor>=1},
+    ];
+    const analyticsEl=document.getElementById('analytics-cards');
+    analyticsCards.forEach(m=>{
+      const c=document.createElement('div');
+      c.className='section';
+      const barW=Math.min(100,Math.abs(parseFloat(m.value))/4*100);
+      const barColor=m.pos?'var(--navy)':'var(--red)';
+      c.innerHTML=`
+        <div class="section-title">${m.label}</div>
+        <div class="gauge-wrap">
+          <div class="gauge-value" style="color:${m.pos?'var(--navy)':'var(--red)'}">${m.value}</div>
+          <div class="gauge-sub">${m.sub}</div>
+          <div class="score-bar"><div class="score-fill" style="width:${barW}%;background:${barColor}"></div></div>
+          <div class="gauge-label">${m.note}</div>
+        </div>`;
+      analyticsEl.appendChild(c);
+    });
+
+    // ── Industry chart ─────────────────────────────────────────────────────
+    const industryPnl={};
+    TR.filter(t=>t.sell_date&&t.sell_date!==''&&t.pnl).forEach(t=>{
+      industryPnl[t.industry]=(industryPnl[t.industry]||0)+t.pnl;
+    });
+    const indLabels=Object.keys(industryPnl);
+    const indData=indLabels.map(k=>industryPnl[k]);
+    const indColors=indData.map(v=>v>=0?'rgba(26,92,58,0.7)':'rgba(139,26,26,0.7)');
+    new Chart(document.getElementById('industryChart'),{
+      type:'bar',
+      data:{labels:indLabels,datasets:[{data:indData,backgroundColor:indColors,borderRadius:4}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,indexAxis:'y',
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' NT$'+fmtSign(ctx.raw)}}},
+        scales:{
+          x:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10}}},
+          y:{ticks:{color:'#4A5D8A',font:{family:'Noto Sans TC',size:11}}},
+        }
+      }
+    });
+
+    // ── PnL Distribution Chart ─────────────────────────────────────────────
+    const closedTrades=TR.filter(t=>t.sell_date&&t.sell_date!==''&&t.pnl);
+    const pnlVals=closedTrades.map(t=>t.pnl);
+    const tradeLabels=closedTrades.map(t=>t.ticker+' '+t.name);
+    const pnlBarColors=pnlVals.map(v=>v>=0?'rgba(26,92,58,0.75)':'rgba(139,26,26,0.75)');
+    new Chart(document.getElementById('pnlDistChart'),{
+      type:'bar',
+      data:{labels:tradeLabels,datasets:[{data:pnlVals,backgroundColor:pnlBarColors,borderRadius:3}]},
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' NT$'+(ctx.raw>=0?'+':'')+fmt(ctx.raw)}}},
+        scales:{
+          x:{ticks:{color:'#4A5D8A',font:{family:'Noto Sans TC',size:10},maxRotation:45}},
+          y:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10},callback:v=>fmtSign(v)}},
+        }
+      }
+    });
+
+    // ── Full metrics detail ────────────────────────────────────────────────
+    const metricsDetail=[
+      ['總本金',      'NT$ '+fmt(M.capital),                                               ''],
+      ['目前權益',    'NT$ '+fmt(M.final_equity),                                          ''],
+      ['累積損益',    (M.total_pnl>=0?'+':'')+' NT$ '+fmt(M.total_pnl),                   M.total_pnl>=0?'pos':'neg'],
+      ['總報酬率',    fmtPct(M.total_ret),                                                 M.total_ret>=0?'pos':'neg'],
+      ['年化報酬率',  fmtPct(M.ann_ret),                                                   M.ann_ret>=0?'pos':'neg'],
+      ['年化波動度',  fmtPct(M.ann_vol),                                                   ''],
+      ['夏普值',      M.sharpe.toFixed(2),                                                 M.sharpe>=1?'pos':'neg'],
+      ['索提諾比率',  M.sortino.toFixed(2),                                                M.sortino>=1?'pos':'neg'],
+      ['最大回撤 MDD',fmtPct(M.mdd),                                                      'neg'],
+      ['交易天數',    M.trading_days+' 天',                                                ''],
+      ['總交易筆數',  M.total_trades+' 筆',                                               ''],
+      ['勝率',        fmtPct(M.win_rate)+' ('+M.win_trades+'W/'+M.loss_trades+'L)',        M.win_rate>=0.5?'pos':'neg'],
+      ['平均獲利',    'NT$ +'+fmt(M.avg_win),                                             'pos'],
+      ['平均虧損',    'NT$ '+fmt(M.avg_loss),                                             'neg'],
+      ['盈虧比',      M.profit_factor.toFixed(2)+'x',                                     M.profit_factor>=1?'pos':'neg'],
+      ['期望值',      (M.expected_value>=0?'+':'')+' NT$ '+fmt(M.expected_value),         M.expected_value>=0?'pos':'neg'],
+    ];
+    const half=Math.ceil(metricsDetail.length/2);
+    let leftHtml='',rightHtml='';
+    metricsDetail.forEach((r,i)=>{
+      const html=`<div class="stat-row"><span class="stat-row-label">${r[0]}</span><span class="stat-row-value ${r[2]}">${r[1]}</span></div>`;
+      if(i<half)leftHtml+=html;else rightHtml+=html;
+    });
+    document.getElementById('metrics-detail').innerHTML=
+      `<div class="stat-rows"><div>${leftHtml}</div><div style="padding-left:20px;border-left:1px solid var(--border)">${rightHtml}</div></div>`;
+  })
+  .catch(err=>{
+    document.getElementById('loading').innerHTML=
+      `<div style="text-align:center;padding:60px">
+        <p style="font-family:var(--mono);font-size:13px;color:var(--red);letter-spacing:0.1em">LOAD_ERROR</p>
+        <p style="color:var(--text3);margin-top:10px;font-size:12px">${err.message}</p>
+        <p style="color:var(--text3);margin-top:6px;font-size:11px">請確認 data.json 與 index.html 在同一資料夾</p>
+      </div>`;
+  });
+</script>
+</body>
+</html>
