@@ -211,13 +211,42 @@ fetch('data.json')
       type:'line',
       data:{labels,datasets:[
         {label:'權益',data:equities,borderColor:'#1A2D5A',borderWidth:2,fill:true,
-         backgroundColor:'rgba(26,45,90,0.06)',pointRadius:0,tension:0.3},
+         backgroundColor:'rgba(26,45,90,0.06)',pointRadius:0,pointHoverRadius:6,
+         pointHoverBackgroundColor:'#1A2D5A',pointHoverBorderColor:'#fff',pointHoverBorderWidth:2,tension:0.3},
         {label:'本金',data:baseline,borderColor:'rgba(26,45,90,0.2)',borderWidth:1,
-         borderDash:[4,4],pointRadius:0,fill:false},
+         borderDash:[4,4],pointRadius:0,pointHoverRadius:0,fill:false},
       ]},
       options:{
         responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' NT$ '+fmt(ctx.raw)}}},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            mode:'index',intersect:false,
+            filter:item=>item.datasetIndex===0,
+            backgroundColor:'rgba(15,30,61,0.97)',
+            titleColor:'#B8E0FF',titleFont:{family:'Space Mono',size:11},
+            bodyColor:'rgba(255,255,255,0.85)',bodyFont:{family:'Space Mono',size:11},
+            padding:12,cornerRadius:8,
+            callbacks:{
+              title:ctx=>'📅  '+ctx[0].label,
+              label:ctx=>{
+                const d=EQ[ctx.dataIndex];
+                const sign=v=>v>=0?'+':'';
+                return[
+                  '最終權益    NT$ '+fmt(d.equity),
+                  '─────────────────────',
+                  '現金        NT$ '+fmt(d.cash),
+                  '持倉市值    NT$ '+fmt(d.position_value),
+                  '─────────────────────',
+                  '累積已實現  '+sign(d.cum_realized)+fmt(d.cum_realized,1),
+                  '未實現損益  '+sign(d.unrealized)+fmt(d.unrealized,1),
+                  '當日損益    '+sign(d.daily_change)+fmt(d.daily_change,1),
+                  '持倉檔數    '+d.num_positions+' 檔',
+                ];
+              },
+            }
+          }
+        },
         scales:{
           x:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',maxTicksLimit:10,font:{family:'Space Mono',size:10}}},
           y:{grid:{color:'rgba(26,45,90,0.05)'},ticks:{color:'#8A99BB',font:{family:'Space Mono',size:10},callback:v=>'NT$'+fmt(v)}},
